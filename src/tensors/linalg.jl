@@ -327,7 +327,12 @@ function cal_interval(i::Int64, len_i::Int64)
     n = LinearAlgebra.BLAS.get_num_threads()
     interval = max(128 * n, fld(len_i, Ndivid))
     start_idx = (i - 1) * interval + 1
-    end_idx = min(i * interval, len_i)
+    end_idx = 0
+    if i < Ndivid
+        end_idx = min(i * interval, len_i)
+    else
+        end_idx = len_i
+    end
     return start_idx <= len_i ? [start_idx, end_idx] : [0, 0]
 end
 
