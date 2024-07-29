@@ -334,9 +334,9 @@ end
 function mul_decompose!(position::Int64,tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTensorMap,α=true, β=false)
     c=blocksectors(tC)[fld(position-1,Ndivid)+1]
     m=cal_interval((position-1)%(Ndivid)+1,size(block(tC, c),1))
-    C = view(block(tC, c), m[1]:m[2], :)
-    C .=0.0
     if m[1]!=0
+        C = view(block(tC, c), m[1]:m[2], :)
+        C .=0.0
         if hasblock(tA, c)
             A = view(block(tA, c), m[1]:m[2], :)
             B = block(tB, c)
