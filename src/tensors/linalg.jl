@@ -325,7 +325,7 @@ end
 
 function cal_interval(i::Int64, len_i::Int64)
     n = LinearAlgebra.BLAS.get_num_threads()
-    interval = max(128 * n, div(len_i, Ndivid))
+    interval = max(128 * n, fld(len_i, Ndivid))
     start_idx = (i - 1) * interval + 1
     end_idx = min(i * interval, len_i)
     return start_idx <= len_i ? [start_idx, end_idx] : [0, 0]
@@ -334,14 +334,14 @@ end
 function mul_decompose!(position::Int64,tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTensorMap,α=true, β=false)
     c=blocksectors(tC)[fld(position-1,Ndivid)+1]
     m=cal_interval((position-1)%(Ndivid)+1,size(block(tC, c),1))
+    C = view(block(tC, c), m[1]:m[2], :)
+    C .=0.0
     if m[1]!=0
         if hasblock(tA, c)
             A = view(block(tA, c), m[1]:m[2], :)
             B = block(tB, c)
-            C = view(block(tC, c), m[1]:m[2], :)
             mul!(StridedView(C), StridedView(A), StridedView(B), α, β)
         elseif β != one(β)
-            C = view(block(tC, c), m[1]:m[2], :)
             rmul!(C, β)
         end
     end
