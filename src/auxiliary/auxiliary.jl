@@ -50,8 +50,6 @@ else
     using Base: @constprop
 end
 
-const MatOrNumber{T<:Number} = Union{DenseMatrix{T},T}
-
 """
     _interleave(a::NTuple{N}, b::NTuple{N}) -> NTuple{2N}
 

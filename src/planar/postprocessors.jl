@@ -12,7 +12,7 @@ function _annotate_temporaries(ex, temporaries)
         if i !== nothing
             rhs = ex.args[2]
             # add `istemp = true` flag
-            newrhs = Expr(:call, rhs.args[1:(end - 1)]..., Val(true))
+            newrhs = Expr(:call, rhs.args[1:(end - 1)]..., true)
             return Expr(:(=), lhs, newrhs)
         end
     elseif ex isa Expr
@@ -51,26 +51,32 @@ end
 # Replace the tensor operations created by `TO.instantiate` with the corresponding
 # planar operations, immediately inserting them with `GlobalRef`.
 
+# NOTE: work around a somewhat unfortunate interface choice in TensorOperations, which we will correct in the future.
+_planaradd!(C, p, A, α, β, backend...) = planaradd!(C, A, p, α, β, backend...)
+_planartrace!(C, p, A, q, α, β, backend...) = planartrace!(C, A, p, q, α, β, backend...)
+function _planarcontract!(C, pAB, A, pA, B, pB, α, β, backend...)
+    return planarcontract!(C, A, pA, B, pB, pAB, α, β, backend...)
+end
 # TODO: replace _planarmethod with planarmethod in everything below
-const _PLANAR_OPERATIONS = (:planaradd!, :planartrace!, :planarcontract!)
+const _PLANAR_OPERATIONS = (:_planaradd!, :_planartrace!, :_planarcontract!)
 
 function _insert_planar_operations(ex)
     if isexpr(ex, :call)
         if ex.args[1] == GlobalRef(TensorOperations, :tensoradd!)
             conjA = popat!(ex.args, 5)
-            @assert !conjA "conj flag should be disabled"
-            return Expr(ex.head, GlobalRef(TensorKit, Symbol(:planaradd!)),
+            @assert conjA == :(:N) "conj flag should be `:N` ($conjA)"
+            return Expr(ex.head, GlobalRef(TensorKit, Symbol(:_planaradd!)),
                         map(_insert_planar_operations, ex.args[2:end])...)
         elseif ex.args[1] == GlobalRef(TensorOperations, :tensorcontract!)
-            conjB = popat!(ex.args, 8)
-            conjA = popat!(ex.args, 5)
-            @assert !conjA && !conjB "conj flags should be disabled ($conjA), ($conjB)"
-            return Expr(ex.head, GlobalRef(TensorKit, Symbol(:planarcontract!)),
+            conjB = popat!(ex.args, 9)
+            conjA = popat!(ex.args, 6)
+            @assert conjA == conjB == :(:N) "conj flag should be `:N` ($conjA), ($conjB)"
+            return Expr(ex.head, GlobalRef(TensorKit, Symbol(:_planarcontract!)),
                         map(_insert_planar_operations, ex.args[2:end])...)
         elseif ex.args[1] == GlobalRef(TensorOperations, :tensortrace!)
             conjA = popat!(ex.args, 6)
-            @assert !conjA "conj flag should be disabled"
-            return Expr(ex.head, GlobalRef(TensorKit, Symbol(:planartrace!)),
+            @assert conjA == :(:N) "conj flag should be `:N` ($conjA)"
+            return Expr(ex.head, GlobalRef(TensorKit, Symbol(:_planartrace!)),
                         map(_insert_planar_operations, ex.args[2:end])...)
         elseif ex.args[1] in TensorOperations.tensoroperationsfunctions
             return Expr(ex.head, GlobalRef(TensorOperations, ex.args[1]),
@@ -82,24 +88,16 @@ function _insert_planar_operations(ex)
     return ex
 end
 
-"""
-    insertplanarbackend(ex, backend)
-
-Insert the backend argument into the tensor operation methods `planaradd!`, `planartrace!`, and `planarcontract!`.
-
-See also: [`TensorOperations.insertbackend`](@ref).
-"""
-function insertplanarbackend(ex, backend)
-    return TO.insertargument(ex, backend, (:planaradd!, :planartrace!, :planarcontract!))
-end
-
-"""
-    insertplanarallocator(ex, allocator)
-
-Insert the allocator argument into the tensor operation methods `planaradd!`, `planartrace!`, and `planarcontract!`.
-
-See also: [`TensorOperations.insertallocator`](@ref).
-"""
-function insertplanarallocator(ex, allocator)
-    return TO.insertargument(ex, allocator, (:planaradd!, :planartrace!, :planarcontract!))
+# Mimick `TO.insert_operationbackend` for planar operations.
+function insert_operationbackend(ex, backend)
+    if isexpr(ex, :call) && ex.args[1] isa GlobalRef &&
+       ex.args[1].mod == TensorKit &&
+       ex.args[1].name ∈ _PLANAR_OPERATIONS
+        b = Backend{backend}()
+        return Expr(:call, ex.args..., b)
+    elseif isa(ex, Expr)
+        return Expr(ex.head, (insert_operationbackend(e, backend) for e in ex.args)...)
+    else
+        return ex
+    end
 end

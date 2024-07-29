@@ -1,7 +1,8 @@
 # Index manipulations
 #---------------------
 """
-    permute!(tdst::AbstractTensorMap, tsrc::AbstractTensorMap, (p₁, p₂)::Index2Tuple)
+    permute!(tdst::AbstractTensorMap{S,N₁,N₂}, tsrc::AbstractTensorMap{S},
+             (p₁, p₂)::Tuple{IndexTuple{N₁},IndexTuple{N₂}}) where {S,N₁,N₂}
         -> tdst
 
 Write into `tdst` the result of permuting the indices of `tsrc`.
@@ -9,16 +10,16 @@ The codomain and domain of `tdst` correspond to the indices in `p₁` and `p₂`
                 
 See [`permute`](@ref) for creating a new tensor and [`add_permute!`](@ref) for a more general version.
 """
-@propagate_inbounds function Base.permute!(tdst::AbstractTensorMap,
-                                           tsrc::AbstractTensorMap,
-                                           p::Index2Tuple)
-    return add_permute!(tdst, tsrc, p, One(), Zero())
+@propagate_inbounds function Base.permute!(tdst::AbstractTensorMap{S,N₁,N₂},
+                                           tsrc::AbstractTensorMap{S},
+                                           p::Index2Tuple{N₁,N₂}) where {S,N₁,N₂}
+    return add_permute!(tdst, tsrc, p, true, false)
 end
 
 """
-    permute(tsrc::AbstractTensorMap, (p₁, p₂)::Index2Tuple;
-            copy::Bool=false)
-        -> tdst::TensorMap
+    permute(tsrc::AbstractTensorMap{S}, (p₁, p₂)::Tuple{IndexTuple{N₁},IndexTuple{N₂}};
+            copy::Bool=false) where {S,N₁,N₂}
+        -> tdst::TensorMap{S,N₁,N₂}
 
 Return tensor `tdst` obtained by permuting the indices of `tsrc`.
 The codomain and domain of `tdst` correspond to the indices in `p₁` and `p₂` of `tsrc` respectively.
@@ -27,8 +28,8 @@ If `copy=false`, `tdst` might share data with `tsrc` whenever possible. Otherwis
 
 To permute into an existing destination, see [permute!](@ref) and [`add_permute!`](@ref)
 """
-function permute(t::AbstractTensorMap, (p₁, p₂)::Index2Tuple{N₁,N₂};
-                 copy::Bool=false) where {N₁,N₂}
+function permute(t::AbstractTensorMap{S}, (p₁, p₂)::Index2Tuple{N₁,N₂};
+                 copy::Bool=false) where {S,N₁,N₂}
     space′ = permute(space(t), (p₁, p₂))
     # share data if possible
     if !copy
@@ -44,13 +45,14 @@ function permute(t::AbstractTensorMap, (p₁, p₂)::Index2Tuple{N₁,N₂};
         return permute!(similar(t, space′), t, (p₁, p₂))
     end
 end
-function permute(t::AdjointTensorMap, (p₁, p₂)::Index2Tuple; copy::Bool=false)
+function permute(t::AdjointTensorMap{S}, (p₁, p₂)::Index2Tuple;
+                 copy::Bool=false) where {S}
     p₁′ = adjointtensorindices(t, p₂)
     p₂′ = adjointtensorindices(t, p₁)
-    return adjoint(permute(adjoint(t), (p₁′, p₂′); copy))
+    return adjoint(permute(adjoint(t), (p₁′, p₂′); copy=copy))
 end
 function permute(t::AbstractTensorMap, p::IndexTuple; copy::Bool=false)
-    return permute(t, (p, ()); copy)
+    return permute(t, (p, ()); copy=copy)
 end
 
 function has_shared_permute(t::TensorMap, (p₁, p₂)::Index2Tuple)
@@ -74,8 +76,8 @@ end
 
 # Braid
 """
-    braid!(tdst::AbstractTensorMap, tsrc::AbstractTensorMap,
-           (p₁, p₂)::Index2Tuple, levels::Tuple)
+    braid!(tdst::AbstractTensorMap{S,N₁,N₂}, tsrc::AbstractTensorMap{S},
+           (p₁, p₂)::Tuple{IndexTuple{N₁},IndexTuple{N₂}}, levels::Tuple) where {S,N₁,N₂}
         -> tdst
 
 Write into `tdst` the result of braiding the indices of `tsrc`.
@@ -85,17 +87,17 @@ which determines whether they will braid over or under any other index with whic
 
 See [`braid`](@ref) for creating a new tensor and [`add_braid!`](@ref) for a more general version.
 """
-@propagate_inbounds function braid!(tdst::AbstractTensorMap,
-                                    tsrc::AbstractTensorMap,
-                                    p::Index2Tuple,
-                                    levels::IndexTuple)
-    return add_braid!(tdst, tsrc, p, levels, One(), Zero())
+@propagate_inbounds function braid!(tdst::AbstractTensorMap{S,N₁,N₂},
+                                    tsrc::AbstractTensorMap{S},
+                                    (p₁, p₂)::Index2Tuple{N₁,N₂},
+                                    levels::IndexTuple) where {S,N₁,N₂}
+    return add_braid!(tdst, tsrc, (p₁, p₂), levels, true, false)
 end
 
 """
-    braid(tsrc::AbstractTensorMap, (p₁, p₂)::Index2Tuple, levels::IndexTuple;
-          copy::Bool = false)
-        -> tdst::TensorMap
+    braid(tsrc::AbstractTensorMap{S}, (p₁, p₂)::Tuple{IndexTuple{N₁},IndexTuple{N₂}}, levels::Tuple;
+          copy::Bool = false) where {S,N₁,N₂}
+        -> tdst::TensorMap{S,N₁,N₂}
 
 Return tensor `tdst` obtained by braiding the indices of `tsrc`.
 The codomain and domain of `tdst` correspond to the indices in `p₁` and `p₂` of `tsrc` respectively.
@@ -106,10 +108,10 @@ If `copy=false`, `tdst` might share data with `tsrc` whenever possible. Otherwis
 
 To braid into an existing destination, see [braid!](@ref) and [`add_braid!`](@ref)
 """
-function braid(t::AbstractTensorMap, (p₁, p₂)::Index2Tuple, levels::IndexTuple;
-               copy::Bool=false)
+function braid(t::AbstractTensorMap{S}, (p₁, p₂)::Index2Tuple, levels::IndexTuple;
+               copy::Bool=false) where {S}
     @assert length(levels) == numind(t)
-    if BraidingStyle(sectortype(t)) isa SymmetricBraiding
+    if BraidingStyle(sectortype(S)) isa SymmetricBraiding
         return permute(t, (p₁, p₂); copy=copy)
     end
     if !copy && p₁ == codomainind(t) && p₂ == domainind(t)
@@ -127,8 +129,8 @@ end
 _transpose_indices(t::AbstractTensorMap) = (reverse(domainind(t)), reverse(codomainind(t)))
 
 """
-    transpose!(tdst::AbstractTensorMap, tsrc::AbstractTensorMap,
-               (p₁, p₂)::Index2Tuple)
+    transpose!(tdst::AbstractTensorMap{S,N₁,N₂}, tsrc::AbstractTensorMap{S},
+               (p₁, p₂)::Tuple{IndexTuple{N₁},IndexTuple{N₂}}) where {S,N₁,N₂}
         -> tdst
 
 Write into `tdst` the result of transposing the indices of `tsrc`.
@@ -141,13 +143,13 @@ See [`transpose`](@ref) for creating a new tensor and [`add_transpose!`](@ref) f
 function LinearAlgebra.transpose!(tdst::AbstractTensorMap,
                                   tsrc::AbstractTensorMap,
                                   (p₁, p₂)::Index2Tuple=_transpose_indices(t))
-    return add_transpose!(tdst, tsrc, (p₁, p₂), One(), Zero())
+    return add_transpose!(tdst, tsrc, (p₁, p₂), true, false)
 end
 
 """
-    transpose(tsrc::AbstractTensorMap, (p₁, p₂)::Index2Tuple;
-              copy::Bool=false)
-        -> tdst::TensorMap
+    transpose(tsrc::AbstractTensorMap{S}, (p₁, p₂)::Tuple{IndexTuple{N₁},IndexTuple{N₂}};
+              copy::Bool=false) where {S,N₁,N₂}
+        -> tdst::TensorMap{S,N₁,N₂}
 
 Return tensor `tdst` obtained by transposing the indices of `tsrc`.
 The codomain and domain of `tdst` correspond to the indices in `p₁` and `p₂` of `tsrc` respectively.
@@ -158,10 +160,10 @@ If `copy=false`, `tdst` might share data with `tsrc` whenever possible. Otherwis
 
 To permute into an existing destination, see [permute!](@ref) and [`add_permute!`](@ref)
 """
-function LinearAlgebra.transpose(t::AbstractTensorMap,
+function LinearAlgebra.transpose(t::AbstractTensorMap{S},
                                  (p₁, p₂)::Index2Tuple=_transpose_indices(t);
-                                 copy::Bool=false)
-    if sectortype(t) === Trivial
+                                 copy::Bool=false) where {S}
+    if sectortype(S) === Trivial
         return permute(t, (p₁, p₂); copy=copy)
     end
     if !copy && p₁ == codomainind(t) && p₂ == domainind(t)
@@ -174,9 +176,9 @@ function LinearAlgebra.transpose(t::AbstractTensorMap,
     end
 end
 
-function LinearAlgebra.transpose(t::AdjointTensorMap,
+function LinearAlgebra.transpose(t::AdjointTensorMap{S},
                                  (p₁, p₂)::Index2Tuple=_transpose_indices(t);
-                                 copy::Bool=false)
+                                 copy::Bool=false) where {S}
     p₁′ = map(n -> adjointtensorindex(t, n), p₂)
     p₂′ = map(n -> adjointtensorindex(t, n), p₁)
     return adjoint(transpose(adjoint(t), (p₁′, p₂′); copy=copy))
@@ -264,23 +266,23 @@ twist(t::AbstractTensorMap, i; inv::Bool=false) = twist!(copy(t), i; inv)
 #-------------------------------------
 # Full implementations based on `add`
 #-------------------------------------
-@propagate_inbounds function add_permute!(tdst::AbstractTensorMap{T,S,N₁,N₂},
+@propagate_inbounds function add_permute!(tdst::AbstractTensorMap{S,N₁,N₂},
                                           tsrc::AbstractTensorMap,
                                           p::Index2Tuple{N₁,N₂},
                                           α::Number,
                                           β::Number,
-                                          backend::AbstractBackend...) where {T,S,N₁,N₂}
+                                          backend::Backend...) where {S,N₁,N₂}
     treepermuter(f₁, f₂) = permute(f₁, f₂, p[1], p[2])
     return add_transform!(tdst, tsrc, p, treepermuter, α, β, backend...)
 end
 
-@propagate_inbounds function add_braid!(tdst::AbstractTensorMap{T,S,N₁,N₂},
+@propagate_inbounds function add_braid!(tdst::AbstractTensorMap{S,N₁,N₂},
                                         tsrc::AbstractTensorMap,
                                         p::Index2Tuple{N₁,N₂},
                                         levels::IndexTuple,
                                         α::Number,
                                         β::Number,
-                                        backend::AbstractBackend...) where {T,S,N₁,N₂}
+                                        backend::Backend...) where {S,N₁,N₂}
     length(levels) == numind(tsrc) ||
         throw(ArgumentError("incorrect levels $levels for tensor map $(codomain(tsrc)) ← $(domain(tsrc))"))
 
@@ -291,23 +293,23 @@ end
     return add_transform!(tdst, tsrc, p, treebraider, α, β, backend...)
 end
 
-@propagate_inbounds function add_transpose!(tdst::AbstractTensorMap{T,S,N₁,N₂},
+@propagate_inbounds function add_transpose!(tdst::AbstractTensorMap{S,N₁,N₂},
                                             tsrc::AbstractTensorMap,
                                             p::Index2Tuple{N₁,N₂},
                                             α::Number,
                                             β::Number,
-                                            backend::AbstractBackend...) where {T,S,N₁,N₂}
+                                            backend::Backend...) where {S,N₁,N₂}
     treetransposer(f₁, f₂) = transpose(f₁, f₂, p[1], p[2])
     return add_transform!(tdst, tsrc, p, treetransposer, α, β, backend...)
 end
 
-function add_transform!(tdst::AbstractTensorMap{T,S,N₁,N₂},
+function add_transform!(tdst::AbstractTensorMap{S,N₁,N₂},
                         tsrc::AbstractTensorMap,
                         (p₁, p₂)::Index2Tuple{N₁,N₂},
                         fusiontreetransform,
                         α::Number,
                         β::Number,
-                        backend::AbstractBackend...) where {T,S,N₁,N₂}
+                        backend::Backend...) where {S,N₁,N₂}
     @boundscheck begin
         permute(space(tsrc), (p₁, p₂)) == space(tdst) ||
             throw(SpaceMismatch("source = $(codomain(tsrc))←$(domain(tsrc)),
@@ -329,7 +331,7 @@ end
 
 # internal methods: no argument types
 function _add_trivial_kernel!(tdst, tsrc, p, fusiontreetransform, α, β, backend...)
-    TO.tensoradd!(tdst[], tsrc[], p, false, α, β, backend...)
+    TO.tensoradd!(tdst[], p, tsrc[], :N, α, β, backend...)
     return nothing
 end
 
@@ -350,8 +352,7 @@ end
 
 function _add_abelian_block!(tdst, tsrc, p, fusiontreetransform, f₁, f₂, α, β, backend...)
     (f₁′, f₂′), coeff = first(fusiontreetransform(f₁, f₂))
-    @inbounds TO.tensoradd!(tdst[f₁′, f₂′], tsrc[f₁, f₂], p, false, α * coeff, β,
-                            backend...)
+    @inbounds TO.tensoradd!(tdst[f₁′, f₂′], p, tsrc[f₁, f₂], :N, α * coeff, β, backend...)
     return nothing
 end
 
@@ -361,30 +362,28 @@ function _add_general_kernel!(tdst, tsrc, p, fusiontreetransform, α, β, backen
     elseif β != 1
         tdst = scale!(tdst, β)
     end
-    β′ = One()
     if Threads.nthreads() > 1
         Threads.@sync for s₁ in sectors(codomain(tsrc)), s₂ in sectors(domain(tsrc))
             Threads.@spawn _add_nonabelian_sector!(tdst, tsrc, p, fusiontreetransform, s₁,
-                                                   s₂, α, β′, backend...)
+                                                   s₂, α, β, backend...)
         end
     else
         for (f₁, f₂) in fusiontrees(tsrc)
             for ((f₁′, f₂′), coeff) in fusiontreetransform(f₁, f₂)
-                @inbounds TO.tensoradd!(tdst[f₁′, f₂′], tsrc[f₁, f₂], p, false, α * coeff,
-                                        β′, backend...)
+                @inbounds TO.tensoradd!(tdst[f₁′, f₂′], p, tsrc[f₁, f₂], :N, α * coeff,
+                                        true, backend...)
             end
         end
     end
     return nothing
 end
 
-# TODO: β argument is weird here because it has to be 1
 function _add_nonabelian_sector!(tdst, tsrc, p, fusiontreetransform, s₁, s₂, α, β,
                                  backend...)
     for (f₁, f₂) in fusiontrees(tsrc)
         (f₁.uncoupled == s₁ && f₂.uncoupled == s₂) || continue
         for ((f₁′, f₂′), coeff) in fusiontreetransform(f₁, f₂)
-            @inbounds TO.tensoradd!(tdst[f₁′, f₂′], tsrc[f₁, f₂], p, false, α * coeff, β,
+            @inbounds TO.tensoradd!(tdst[f₁′, f₂′], p, tsrc[f₁, f₂], :N, α * coeff, true,
                                     backend...)
         end
     end

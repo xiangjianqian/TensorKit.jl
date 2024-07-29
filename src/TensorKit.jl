@@ -95,7 +95,7 @@ using Strided
 using VectorInterface
 
 using TensorOperations: TensorOperations, @tensor, @tensoropt, @ncon, ncon
-using TensorOperations: IndexTuple, Index2Tuple, linearize, AbstractBackend
+using TensorOperations: IndexTuple, Index2Tuple, linearize, Backend
 const TO = TensorOperations
 
 using LRUCache
@@ -117,8 +117,6 @@ using LinearAlgebra: norm, dot, normalize, normalize!, tr,
                      isposdef, isposdef!, ishermitian,
                      Diagonal, Hermitian
 import Base.Meta
-
-using Random: Random
 
 using PackageExtensionCompat
 
@@ -165,16 +163,11 @@ Base.show(io::IO, ::IndexError{Nothing}) = print(io, "IndexError()")
 Base.show(io::IO, e::IndexError) = print(io, "IndexError(", e.message, ")")
 
 # typerepr
-# type_repr(T::Type) = repr(T)
+type_repr(T::Type) = repr(T)
 
 # Definitions and methods for superselection sectors (quantum numbers)
 #----------------------------------------------------------------------
-
-include(joinpath(@__DIR__, "..", "TensorKitSectors", "src", "TensorKitSectors.jl"))
-using .TensorKitSectors
-import .TensorKitSectors: dim, BraidingStyle, FusionStyle, ⊠, ⊗
-import .TensorKitSectors: dual, type_repr
-import .TensorKitSectors: twist
+include("sectors/sectors.jl")
 
 # Constructing and manipulating fusion trees and iterators thereof
 #------------------------------------------------------------------
