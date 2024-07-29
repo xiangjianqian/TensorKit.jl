@@ -281,7 +281,7 @@ function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTen
         for (i,c) in enumerate(blocksectors(tC))
             C_d=AMDGPU.zeros(Float64,size(block(tC,c)))
             if hasblock(tA, c)
-                A_d = ROCrray(block(tA, c))
+                A_d = ROCArray(block(tA, c))
                 B_d = ROCArray(block(tB, c))
                 mul!(C_d, A_d, B_d, α, β)
             elseif β != one(β)
