@@ -340,13 +340,13 @@ function mul_decompose!(position::Int64,tC::AbstractTensorMap, tA::AbstractTenso
     c=blocksectors(tC)[fld(position-1,Ndivid)+1]
     m=cal_interval((position-1)%(Ndivid)+1,size(block(tC, c),1))
     if m[1]!=0
-        C = view(block(tC, c), m[1]:m[2], :)
-        C .=0.0
         if hasblock(tA, c)
+            C = view(block(tC, c), m[1]:m[2], :)
             A = view(block(tA, c), m[1]:m[2], :)
             B = block(tB, c)
             mul!(StridedView(C), StridedView(A), StridedView(B), α, β)
         elseif β != one(β)
+            C = view(block(tC, c), m[1]:m[2], :)
             rmul!(C, β)
         end
     end
