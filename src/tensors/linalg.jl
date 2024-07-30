@@ -278,7 +278,7 @@ end
 
 function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTensorMap,α=true, β=false)
     if GPU_backend=="AMD"
-        for (i,c) in enumerate(blocksectors(tC))
+        for c in blocksectors(tC)
             C_d=AMDGPU.zeros(Float64,size(block(tC,c)))
             if hasblock(tA, c)
                 A_d = ROCArray(block(tA, c))
