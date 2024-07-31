@@ -279,7 +279,7 @@ end
 function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTensorMap,α=true, β=false)
     if GPU_backend=="AMD"
         for c in blocksectors(tC)
-            C_d=AMDGPU.zeros(Float64,size(block(tC,c)))
+            C_d=AMDGPU.zeros(eltype(block(tC,c)),size(block(tC,c)))
             if hasblock(tA, c)
                 A_d = ROCArray(block(tA, c))
                 B_d = ROCArray(block(tB, c))
@@ -291,7 +291,7 @@ function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTen
         end
     elseif GPU_backend=="CUDA"
         for c in blocksectors(tC)
-            C_d=CUDA.zeros(Float64,size(block(tC,c)))
+            C_d=CUDA.zeros(eltype(block(tC,c)),size(block(tC,c)))
             if hasblock(tA, c)
                 A_d = CuArray(block(tA, c))
                 B_d = CuArray(block(tB, c))
