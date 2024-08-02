@@ -284,10 +284,13 @@ function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTen
                 A_d = ROCArray(block(tA, c))
                 B_d = ROCArray(block(tB, c))
                 mul!(C_d, A_d, B_d, α, β)
+                AMDGPU.unsafe_free!(A_d)
+                AMDGPU.unsafe_free!(B_d)
             elseif β != one(β)
                 rmul!(C_d,β)
             end
             copyto!(block(tC,c), C_d)
+            AMDGPU.unsafe_free!(C_d)
         end
     elseif GPU_backend=="CUDA"
         for c in blocksectors(tC)
@@ -296,10 +299,13 @@ function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTen
                 A_d = CuArray(block(tA, c))
                 B_d = CuArray(block(tB, c))
                 mul!(C_d, A_d, B_d, α, β)
+                CUDA.unsafe_free!(A_d)
+                CUDA.unsafe_free!(B_d)
             elseif β != one(β)
                 rmul!(C_d,β)
             end
             copyto!(block(tC,c), C_d)
+            CUDA.unsafe_free!(C_d)
         end
     else
         if Threads.nthreads()>1
