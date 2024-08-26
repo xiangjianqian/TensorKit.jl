@@ -277,7 +277,6 @@ end
 function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTensorMap,α=true, β=false)
     if GPU_backend=="AMD"
         C_ds=[AMDGPU.zeros(eltype(block(tC,c)),size(block(tC,c))) for c in blocksectors(tC)]
-        println(typeof(C_ds[1]))
         A_ds = [ROCArray(block(tA, c)) for c in blocksectors(tC)]
         B_ds = [ROCArray(block(tB, c)) for c in blocksectors(tC)]
         for c in 1:length(blocksectors(tC))
@@ -293,9 +292,11 @@ function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTen
                 AMDGPU.unsafe_free!(a)
             end
         end
+        C_ds=nothing
+        A_ds=nothing
+        B_ds=nothing
     elseif GPU_backend=="CUDA"
         C_ds=[CUDA.zeros(eltype(block(tC,c)),size(block(tC,c))) for c in blocksectors(tC)]
-        println(typeof(C_ds[1]))
         A_ds = [CuArray(block(tA, c)) for c in blocksectors(tC)]
         B_ds = [CuArray(block(tB, c)) for c in blocksectors(tC)]
         for c in 1:length(blocksectors(tC))
@@ -311,6 +312,9 @@ function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTen
                 CUDA.unsafe_free!(a)
             end
         end
+        C_ds=nothing
+        A_ds=nothing
+        B_ds=nothing
     else
         for c in blocksectors(tC)
             if hasblock(tA, c) # then also tB should have such a block
@@ -325,6 +329,7 @@ function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTen
     end
     return nothing
 end
+
 
 # TODO: reconsider wrapping the blocks in a StridedView, consider spawning threads for different blocks
 
