@@ -186,10 +186,21 @@ function TensorMap(f, codom::ProductSpace{S,N₁},
     rowr, rowdims = _buildblockstructure(codom, blocksectoriterator)
     colr, coldims = _buildblockstructure(dom, blocksectoriterator)
     if !isreal(I)
-        data = SectorDict(c => complex(f((rowdims[c], coldims[c])))
-                          for c in blocksectoriterator)
+        datas=Vector{typeof(complex(f((1,1))))}(undef,length(blocksectoriterator))
+        @tasks for i in 1:length(blocksectoriterator)
+            @set scheduler = :greedy
+            datas[i]=comlex(f((rowdims[blocksectoriterator[i]], coldims[blocksectoriterator[i]])))
+        end
+        data = TensorKit.SectorDict(c => datas[i] for (i,c) in enumerate(blocksectoriterator))
+        # data = SectorDict(c => complex(f((rowdims[c], coldims[c]))) for c in blocksectoriterator)
     else
-        data = SectorDict(c => f((rowdims[c], coldims[c])) for c in blocksectoriterator)
+        datas=Vector{typeof(f((1,1)))}(undef,length(blocksectoriterator))
+        @tasks for i in 1:length(blocksectoriterator)
+            @set scheduler = :greedy
+            datas[i]=f((rowdims[blocksectoriterator[i]], coldims[blocksectoriterator[i]]))
+        end
+        data = TensorKit.SectorDict(c => datas[i] for (i,c) in enumerate(blocksectoriterator))
+        # data = SectorDict(c => f((rowdims[c], coldims[c])) for c in blocksectoriterator)
     end
     F₁ = fusiontreetype(I, N₁)
     F₂ = fusiontreetype(I, N₂)
@@ -441,13 +452,18 @@ function Base.similar(t::TensorMap{S}, ::Type{T}, P::TensorMapSpace{S}) where {T
     end
     F₁ = fusiontreetype(I, N₁)
     F₂ = fusiontreetype(I, N₂)
+    blocksectoriterator = blocksectors(P)
     if space(t) == P
-        data = SectorDict(c => similar(b, T) for (c, b) in blocks(t))
+        datas=Vector{storagetype(t)}(undef,length(blocksectoriterator))
+        @tasks for i in 1:length(blocksectoriterator)
+            @set scheduler = :greedy
+            datas[i]= similar(block(t,blocksectoriterator[i]), T)
+        end
+        data = TensorKit.SectorDict(c => datas[i] for (i,c) in enumerate(blocksectoriterator))
+        # data = SectorDict(c => similar(b, T) for (c, b) in blocks(t))
         A = typeof(data)
         return TensorMap{S,N₁,N₂,I,A,F₁,F₂}(data, codomain(P), domain(P), t.rowr, t.colr)
     end
-
-    blocksectoriterator = blocksectors(P)
     # try to recycle rowr
     if codomain(P) == codomain(t) && all(c -> haskey(t.rowr, c), blocksectoriterator)
         if length(t.rowr) == length(blocksectoriterator)
@@ -485,8 +501,13 @@ function Base.similar(t::TensorMap{S}, ::Type{T}, P::TensorMapSpace{S}) where {T
         colr, coldims = _buildblockstructure(domain(P), blocksectoriterator)
     end
     M = similarstoragetype(t, T)
-    data = SectorDict{I,M}(c => M(undef, (rowdims[c], coldims[c]))
-                           for c in blocksectoriterator)
+    datas=Vector{storagetype(t)}(undef,length(blocksectoriterator))
+    @tasks for i in 1:length(blocksectoriterator)
+        @set scheduler = :greedy
+        datas[i]= zeros(T, (rowdims[blocksectoriterator[i]], coldims[blocksectoriterator[i]]))
+    end
+    data = TensorKit.SectorDict(c => datas[i] for (i,c) in enumerate(blocksectoriterator))
+    # data = SectorDict{I,M}(c => M(undef, (rowdims[c], coldims[c])) for c in blocksectoriterator)
     A = typeof(data)
     return TensorMap{S,N₁,N₂,I,A,F₁,F₂}(data, codomain(P), domain(P), rowr, colr)
 end
