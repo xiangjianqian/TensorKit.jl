@@ -1,8 +1,6 @@
 using AMDGPU
 using CUDA
 GPU_backend="CPU"
-using OhMyThreads
-Ndivid=Threads.nthreads()
 
 # Basic algebra
 #---------------
@@ -278,82 +276,51 @@ end
 
 function mul_part!(tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTensorMap,α=true, β=false)
     if GPU_backend=="AMD"
-        for c in blocksectors(tC)
-            C_d=AMDGPU.zeros(eltype(block(tC,c)),size(block(tC,c)))
-            if hasblock(tA, c)
-                A_d = ROCArray(block(tA, c))
-                B_d = ROCArray(block(tB, c))
-                mul!(C_d, A_d, B_d, α, β)
-                AMDGPU.unsafe_free!(A_d)
-                AMDGPU.unsafe_free!(B_d)
+        C_ds=[AMDGPU.zeros(eltype(block(tC,c)),size(block(tC,c))) for c in blocksectors(tC)]
+        println(typeof(C_ds[1]))
+        A_ds = [ROCArray(block(tA, c)) for c in blocksectors(tC)]
+        B_ds = [ROCArray(block(tB, c)) for c in blocksectors(tC)]
+        for c in 1:length(blocksectors(tC))
+            if hasblock(tA, blocksectors(tC)[c])
+                mul!(C_ds[c], A_ds[c], B_ds[c], α, β)
             elseif β != one(β)
-                rmul!(C_d,β)
+                rmul!(C_ds[c],β)
             end
-            copyto!(block(tC,c), C_d)
-            AMDGPU.unsafe_free!(C_d)
+            copyto!(block(tC,blocksectors(tC)[c]), C_ds[c])
+        end
+        for arr in (A_ds, B_ds, C_ds)
+            for a in arr
+                AMDGPU.unsafe_free!(a)
+            end
         end
     elseif GPU_backend=="CUDA"
-        for c in blocksectors(tC)
-            C_d=CUDA.zeros(eltype(block(tC,c)),size(block(tC,c)))
-            if hasblock(tA, c)
-                A_d = CuArray(block(tA, c))
-                B_d = CuArray(block(tB, c))
-                mul!(C_d, A_d, B_d, α, β)
-                CUDA.unsafe_free!(A_d)
-                CUDA.unsafe_free!(B_d)
+        C_ds=[CUDA.zeros(eltype(block(tC,c)),size(block(tC,c))) for c in blocksectors(tC)]
+        println(typeof(C_ds[1]))
+        A_ds = [CuArray(block(tA, c)) for c in blocksectors(tC)]
+        B_ds = [CuArray(block(tB, c)) for c in blocksectors(tC)]
+        for c in 1:length(blocksectors(tC))
+            if hasblock(tA, blocksectors(tC)[c])
+                mul!(C_ds[c], A_ds[c], B_ds[c], α, β)
             elseif β != one(β)
-                rmul!(C_d,β)
+                rmul!(C_ds[c],β)
             end
-            copyto!(block(tC,c), C_d)
-            CUDA.unsafe_free!(C_d)
+            copyto!(block(tC,blocksectors(tC)[c]), C_ds[c])
         end
-    else
-        if Threads.nthreads()>1
-            ntasks = Threads.nthreads()
-            scheduler = GreedyScheduler(; ntasks)
-            task(i) = mul_decompose!(i, tC, tA, tB, α, β)
-            tforeach(task, [i for i in 1:Ndivid*length(blocksectors(tC))]; scheduler)
-        else
-            for c in blocksectors(tC)
-                if hasblock(tA, c) # then also tB should have such a block
-                    A = block(tA, c)
-                    B = block(tB, c)
-                    C = block(tC, c)
-                    mul!(StridedView(C), StridedView(A), StridedView(B), α, β)
-                elseif β != one(β)
-                    rmul!(block(tC, c), β)
-                end
+        for arr in (A_ds, B_ds, C_ds)
+            for a in arr
+                CUDA.unsafe_free!(a)
             end
         end
-    end
-    return nothing
-end
-
-function cal_interval(i::Int64, len_i::Int64)
-    n = LinearAlgebra.BLAS.get_num_threads()
-    interval = max(128 * n, fld(len_i, Ndivid))
-    start_idx = (i - 1) * interval + 1
-    end_idx = 0
-    if i < Ndivid
-        end_idx = min(i * interval, len_i)
     else
-        end_idx = len_i
-    end
-    return start_idx <= len_i ? [start_idx, end_idx] : [0, 0]
-end
-
-function mul_decompose!(position::Int64,tC::AbstractTensorMap, tA::AbstractTensorMap, tB::AbstractTensorMap,α=true, β=false)
-    c=blocksectors(tC)[fld(position-1,Ndivid)+1]
-    m=cal_interval((position-1)%(Ndivid)+1,size(block(tC, c),1))
-    if m[1]!=0
-        if hasblock(tA, c)
-            C = view(block(tC, c), m[1]:m[2], :)
-            A = view(block(tA, c), m[1]:m[2], :)
-            B = block(tB, c)
-            mul!(StridedView(C), StridedView(A), StridedView(B), α, β)
-        elseif β != one(β)
-            C = view(block(tC, c), m[1]:m[2], :)
-            rmul!(C, β)
+        for c in blocksectors(tC)
+            if hasblock(tA, c) # then also tB should have such a block
+                A = block(tA, c)
+                B = block(tB, c)
+                C = block(tC, c)
+                mul!(StridedView(C), StridedView(A), StridedView(B), α, β)
+            elseif β != one(β)
+                rmul!(block(tC, c), β)
+            end
         end
     end
     return nothing
